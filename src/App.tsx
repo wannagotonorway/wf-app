@@ -1,35 +1,88 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from "react";
+import TodoList from "./components/TodoList";
+import TodoForm from "./components/TodoForm";
+import "./App.css";
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+interface Todo {
+  _id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
 }
 
-export default App
+function App() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTodos = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/todos");
+      const data = await response.json();
+      setTodos(data);
+    } catch (error) {
+      console.error("Ошибка загрузки:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addTodo = async (text: string) => {
+    try {
+      const response = await fetch("http://localhost:5000/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const newTodo = await response.json();
+      setTodos([newTodo, ...todos]);
+    } catch (error) {
+      console.error("Ошибка добавления:", error);
+    }
+  };
+
+  const toggleTodo = async (id: string, completed: boolean) => {
+    try {
+      const todo = todos.find((t) => t._id === id);
+      if (!todo) return;
+
+      const response = await fetch(`http://localhost:5000/api/todos/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: todo.text, completed: !completed }),
+      });
+      const updatedTodo = await response.json();
+      setTodos(todos.map((t) => (t._id === id ? updatedTodo : t)));
+    } catch (error) {
+      console.error("Ошибка обновления:", error);
+    }
+  };
+
+  const deleteTodo = async (id: string) => {
+    try {
+      await fetch(`http://localhost:5000/api/todos/${id}`, {
+        method: "DELETE",
+      });
+      setTodos(todos.filter((t) => t._id !== id));
+    } catch (error) {
+      console.error("Ошибка удаления:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  if (loading) {
+    return <div className="loading">Загрузка...</div>;
+  }
+
+  return (
+    <div className="app">
+      <h1>Todo App</h1>
+      <TodoForm onAdd={addTodo} />
+      <TodoList todos={todos} onToggle={toggleTodo} onDelete={deleteTodo} />
+    </div>
+  );
+}
+
+export default App;
